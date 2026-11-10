@@ -1,0 +1,26 @@
+# Data and outputs are large (tens of GB) and regenerable — never tracked
+data/
+output/
+www/
+app/data/
+
+# Published shinylive export (regenerate with shinylive::export("app", "docs"))
+docs/
+
+# R session state — the project must not depend on a restored workspace
+.RData
+.Rhistory
+.Rapp.history
+.Rproj.user/
+
+# macOS
+.DS_Store
+_archive/
+
+# API keys — read with Sys.getenv(); never committed
+.Renviron
+
+# Deployment records (account-specific) and local assistant files
+rsconnect/
+CLAUDE.md
+.claude/
