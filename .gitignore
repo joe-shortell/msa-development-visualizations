@@ -1,8 +1,11 @@
 # Data and outputs are large (tens of GB) and regenerable — never tracked
 data/
 output/
-www/
 app/data/
+# the app's images, rebuilt by R/10_build_app_data.R (app/www/fonts/ is tracked:
+# the bundled chart font and its licence can't be regenerated)
+app/www/frames/
+app/www/basemap/
 
 # Published shinylive export (regenerate with shinylive::export("app", "docs"))
 docs/
@@ -12,6 +15,7 @@ docs/
 .Rhistory
 .Rapp.history
 .Rproj.user/
+Rplots.pdf
 
 # macOS
 .DS_Store
@@ -20,7 +24,20 @@ _archive/
 # API keys — read with Sys.getenv(); never committed
 .Renviron
 
-# Deployment records (account-specific) and local assistant files
+# Deployment records (account-specific)
 rsconnect/
+
+# AI assistant files (Claude Code and similar): instructions, settings, skills,
+# agents, MCP config. Never pushed.
 CLAUDE.md
+CLAUDE.local.md
+CLAUDE*.md
 .claude/
+.claude*
+.mcp.json
+AGENTS.md
+.agents/
+skills/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md

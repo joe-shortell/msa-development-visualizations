@@ -14,8 +14,8 @@ This projects seeks to visualize how development patterns differed between the n
 
 ## Features
 
-- The main visualization is a national-level map showing new land developed per new resident for the nation's 30 largest MSAs. The user can also toggle this map to see the absolute change in both population and developed land area.
-- By clicking on an MSA, the user can see a dot desnity map of population growth/decline within that metro for the period between the 2000 and 202 Censuses. 
+- The main visualization is a national-level map of the nation's 30 largest MSAs: each circle's size shows how much land was newly developed, and its colour how many new residents arrived per square mile of that new land. The user can choose the years and the type of developed land.
+- By clicking on an MSA, the user can see a dot desnity map of population growth/decline within that metro for the period between the 2000 and 2020 Censuses. 
 - The user can also see a time lapse of developed land within each MSA over the past two decades.
 
 ## Key findings
@@ -24,25 +24,27 @@ TO-DO
 
 ## Methodology
 
-1. **Pick the metros.** The 30 largest MSAs by 2024 ACS population, using 2024 boundaries for every year. Each MSA's principal cities are the places named in its title (e.g. Dallas, Fort Worth and Arlington).
-2. **Population.** Annual ACS 1-year totals for each MSA and principal city.
-3. **Developed land.** Annual NLCD rasters are cropped to each MSA and city boundary, and the 30 m pixels in the four developed classes are counted and converted to square miles.
+1. **Pick the metros.** The 30 largest MSAs by 2024 ACS population, using current boundaries for every year.
+2. **Population.** Each MSA's population on July 1 of each year, 1999–2024, is the sum of its counties' Census population estimates, using the counties in the 2023 OMB delineation for every year. So all years share the same boundaries, and change between years is growth rather than redefinition. One county, Broomfield, CO (created in 2001, in the Denver MSA), has no 1999 estimate; the part of it the 1999 figures would miss is filled from 2000 census blocks.
+3. **Developed land.** Annual NLCD rasters are cropped to each MSA boundary, and the 30 m pixels in the four developed classes are counted and converted to square miles.
 4. **Land per new resident.** For the selected years, the change in developed area divided by the change in population. This is only shown for MSAs that gained people.
-5. **Dot-density map.** 2000 and 2020 tract populations are moved onto 2010 tract boundaries with the NHGIS crosswalks, so each tract is compared on the same footprint. Each tract gets one dot per 500 people gained or lost, placed at random within the tract, with water clipped out.
+5. **Dot-density map.** 2000 and 2020 block populations are summed into 2010 block groups with the NHGIS block crosswalks, so each block group is compared on the same footprint. Each block group gets one dot per 500 people gained or lost, placed at random within the block group, with water clipped out.
 6. **Time-lapse.** One frame per year of developed land in each MSA, 1999–2024.
 
 ## Data sources
 
 ### Population: U.S. Census Bureau
 
-All Census data is pulled through the Census API with [tidycensus](https://walker-data.com/tidycensus/).
+Census counts and the ACS are pulled through the Census API with [tidycensus](https://walker-data.com/tidycensus/). The county population estimates and the delineation file are downloaded from the Census Bureau's website.
 
 | Dataset | Years | Used for |
 |------------------------|------------------------|------------------------|
-| American Community Survey 1-Year Estimates, table B01003 (Total Population) | 2005–2019, 2021–2024 | Annual population of each MSA (CBSA) and its principal cities (places). These drive the year slider and the change tables. 2020 is skipped because the Census Bureau did not release standard 1-year ACS estimates that year. |
-| 2000 Census, Summary File 1, P001001 (Total Population) | 2000 | Tract population at the start of the dot-density map |
-| 2010 Census, Summary File 1, P001001 (Total Population) | 2010 | Tract population on the 2010 tract boundaries that all years are mapped to |
-| 2020 Census, Redistricting Data (P.L. 94-171), P1_001N (Total Population) | 2020 | Tract population at the end of the dot-density map |
+| Population Estimates Program, county population estimates (July 1): 1990–2000, 2000–2010 and 2010–2020 intercensal series; Vintage 2025 | 1999–2024 | Annual population of each MSA, summed from its counties. These drive the national map and its year slider. |
+| OMB metropolitan statistical area delineation file (`list1_2023.xlsx`) | 2023 | Which counties make up each MSA, applied to every year |
+| American Community Survey 1-Year Estimates, table B01003 (Total Population) | 2024 | Ranking the MSAs to choose the 30 largest |
+| 2000 Census, Summary File 1, P001001 (Total Population) | 2000 | Block population at the start of the dot-density map (and the Broomfield, CO fill for 1999) |
+| 2010 Census, Summary File 1, P001001 (Total Population) | 2010 | Block-group population on the 2010 block groups that 2000 and 2020 are mapped to |
+| 2020 Census, Redistricting Data (P.L. 94-171), P1_001N (Total Population) | 2020 | Block population at the end of the dot-density map |
 
 The 30 largest MSAs are chosen by their 2024 ACS population.
 
@@ -50,16 +52,16 @@ The 30 largest MSAs are chosen by their 2024 ACS population.
 
 Downloaded with [tigris](https://github.com/walkerke/tigris) and tidycensus.
 
-- **MSA (CBSA) and place boundaries, 2024.** These are the MSA outlines and city outlines on the map.
-- **Census tracts, 2010.** Population dots are scattered within these.
-- **Counties and area hydrography (water).** Water is clipped out of the tracts so dots don't land in lakes, rivers or bays.
+- **MSA (CBSA) boundaries, 2024.** These are the MSA outlines on the map.
+- **Census block groups, 2010.** Population dots are scattered within these.
+- **Counties and area hydrography (water).** Water is clipped out of the block groups so dots don't land in lakes, rivers or bays.
 
-### Tract crosswalks: IPUMS NHGIS
+### Block crosswalks: IPUMS NHGIS
 
-[NHGIS geographic crosswalks](https://www.nhgis.org/geographic-crosswalks) re-weight 2000 and 2020 tract populations onto 2010 tract boundaries (population weights), so change from 2000 to 2020 is measured on one consistent geography.
+[NHGIS geographic crosswalks](https://www.nhgis.org/geographic-crosswalks) re-weight 2000 and 2020 block populations into 2010 block groups (population weights), so change from 2000 to 2020 is measured on one consistent geography.
 
-- `nhgis_tr2000_tr2010.csv`
-- `nhgis_tr2020_tr2010.csv`
+- `nhgis_blk2000_bg2010.csv`
+- `nhgis_blk2020_bg2010.csv`
 
 > Steven Manson, Jonathan Schroeder, David Van Riper, Katherine Knowles, Tracy Kugler, Finn Roberts, and Steven Ruggles. IPUMS National Historical Geographic Information System. Minneapolis, MN: IPUMS. <http://doi.org/10.18128/D050.V19.0> *(check the current version number on the NHGIS citation page)*
 
@@ -74,17 +76,19 @@ Downloaded with [tigris](https://github.com/walkerke/tigris) and tidycensus.
 | 23    | Developed, Medium Intensity | 50–79%             |
 | 24    | Developed, High Intensity   | 80–100%            |
 
-These give the developed area in each MSA and city for each year (and "total developed" as the sum of all four), plus the time-lapse GIFs.
+These give the developed area in each MSA for each year (and "total developed" as the sum of all four), plus the time-lapse GIFs.
 
 ### Basemap: CARTO
 
-The map's background tiles are [CARTO Positron](https://carto.com/basemaps), built on © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors. They require a CARTO API key.
+The MSA view's dot map uses [CARTO Dark Matter](https://carto.com/basemaps) tiles, built on © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors. They require a CARTO API key. (The national map has no tiles: its land, labels and shaded relief are drawn by the app.)
 
 ## Limitations
 
-<!-- Caveats a careful reader should know: ACS 1-year sampling error and the
-     65,000-population threshold for places, no 2020 ACS 1-year, decennial dots
-     cover 2000–2020 only, NLCD classification error, fixed 2024 boundaries. -->
+<!-- Caveats a careful reader should know: the national map's populations are
+     July 1 estimates (between censuses they are modelled, not counted) while the
+     dots and comparison chart use April 1 census counts, so the two differ
+     slightly; decennial dots cover 2000–2020 only; NLCD classification error;
+     fixed current boundaries. -->
 
 ## Project structure
 
@@ -113,7 +117,7 @@ The map's background tiles are [CARTO Positron](https://carto.com/basemaps), bui
 ### Running the app
 
 <!-- The one command to launch the app locally, and that it needs app/data built
-     by step 09. -->
+     by step 10. -->
 
 ## Testing
 

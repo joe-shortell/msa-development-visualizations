@@ -2,10 +2,24 @@ library(terra)
 library(sf)
 library(here)
 
-source(here("R", "utils.R"))   # slugify()
+source(here("R", "utils.R"))   # slugify(), msa_frame()
 
 # --- parameters -------------------------------------------------------
 years <- 1999:2024
+
+# Optional: re-crop only the years given on the command line, e.g.
+# `Rscript R/02_load_transform_and_crop_lc_rasters.R 2024`. Useful for repairing
+# one year's crops without the multi-hour full run.
+# Arguments are parsed as integers and must fall within `years`; with no
+# argument, every year is processed.
+year_filter <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)))
+if (length(year_filter) > 0) {
+  if (anyNA(year_filter) || !all(year_filter %in% years)) {
+    stop("Year arguments must be integers within ", min(years), "-", max(years), ".")
+  }
+  years <- year_filter
+  message("Cropping only: ", paste(years, collapse = ", "))
+}
 
 # where the raw NLCD rasters live, and where to put the cropped ones
 lc_dir   <- here("data", "raw", "landcover")
@@ -18,9 +32,12 @@ template_area <- readRDS(
 
 msas <- template_area$MSA   # or template_area$NAME
 
-# we’ll reproject once, when we see the first NLCD raster
-template_area_transformed <- NULL
-msa_square_extents <- NULL   # list of square extents per MSA
+# Each MSA's GIF frame: a Web Mercator square shared with the app's dot map
+# (msa_frame() in utils.R). Crops are cut to cover it once reprojected.
+msa_frames <- msa_frame(template_area)
+
+# crop extents, worked out once we see the first NLCD raster's CRS
+msa_crop_extents <- NULL
 
 terraOptions(todisk = FALSE)  # encourage in-memory operations (optional)
 
@@ -45,48 +62,32 @@ for (yr in years) {
   message("Loading NLCD TIF for ", yr, " ...")
   r <- rast(tif_path)
   
-  # 2. Transform MSAs to raster CRS (once) and precompute square extents ------
-  if (is.null(template_area_transformed)) {
-    template_area_transformed <- st_transform(
-      template_area,
-      st_crs(terra::crs(r))
-    )
-    
-    # precompute one square extent per MSA
-    msa_square_extents <- lapply(1:nrow(template_area_transformed), function(i) {
-      bb <- terra::ext(template_area_transformed[i, ])
-      # bb = c(xmin, xmax, ymin, ymax)
-      xmin <- bb[1]; xmax <- bb[2]
-      ymin <- bb[3]; ymax <- bb[4]
-      
-      w <- xmax - xmin
-      h <- ymax - ymin
-      
-      # side of square = max(width, height)
-      side <- max(w, h)
-      
-      # center of bbox
-      cx <- (xmin + xmax) / 2
-      cy <- (ymin + ymax) / 2
-      
-      # build square extent centered on MSA bbox center
-      terra::ext(
-        cx - side / 2, cx + side / 2,
-        cy - side / 2, cy + side / 2
-      )
+  # 2. Crop extents covering each MSA's Mercator frame (computed once) --------
+  # The GIF is drawn in Web Mercator (step 09), but the NLCD is in Albers. The
+  # Mercator square becomes a slightly rotated, curved-edged shape in Albers,
+  # so each crop is that shape's Albers bounding box: a rectangle that fully
+  # contains the frame. Edges are densified before transforming so the curve
+  # is followed, and a 2 km margin keeps the frame's edge cells from falling
+  # off the crop when step 09 reprojects it.
+  if (is.null(msa_crop_extents)) {
+    frames_albers <- msa_frames |>
+      st_segmentize(1000) |>
+      st_transform(st_crs(terra::crs(r)))
+
+    msa_crop_extents <- lapply(seq_len(nrow(frames_albers)), function(i) {
+      bb <- st_bbox(frames_albers[i, ])
+      terra::ext(bb[["xmin"]] - 2000, bb[["xmax"]] + 2000,
+                 bb[["ymin"]] - 2000, bb[["ymax"]] + 2000)
     })
   }
   
-  # 3. Crop to each MSA *square* bbox, keep only developed classes, save -----
+  # 3. Crop to each MSA's frame extent, keep only developed classes, save -----
   for (i in seq_along(msas)) {
     msa_name <- msas[i]
     msa_slug <- slugify(msa_name)
-    
-    # square extent for this MSA (same for all years)
-    ext_sq <- msa_square_extents[[i]]
-    
-    # crop to square around MSA
-    lc_crop <- terra::crop(r, ext_sq)
+
+    # crop extent for this MSA (same for all years, so frames can't shift)
+    lc_crop <- terra::crop(r, msa_crop_extents[[i]])
     
     # keep only developed classes (21–24), preserve their distinct values
     lc_dev <- terra::app(
